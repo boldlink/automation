@@ -1,0 +1,162 @@
+pipeline {
+    agent any
+    // Run the jobs every 15 minutes Mon-Fri
+    triggers {
+        pollSCM('*/15 * * * 1-5')
+    }
+    //Global env variables
+    environment {
+        REGION = '<REGION>'
+        DEPLOY_TAG = 'master'
+        TF_TAG = 'master'
+        // Turn off/on pipeline stages
+        RUN_TF_DEV = 'true'
+        RUN_TF_STAGE = 'true'
+        RUN_TF_PROD = 'true'
+        RUN_APP_DEV = 'true'
+        RUN_APP_STAGE = 'true'
+        RUN_APP_PROD = 'true'
+        // (Optional) The version for the build, by default applies to DEV, other environments should have their own spefic TAG
+        // TAG = '0.2.2'
+    }
+    stages {
+        stage('Grab scripts') {
+            steps {
+                sh '''
+                    git archive --remote=ssh://git@<REPO_URL> ${TF_TAG} scripts | tar -x
+                    git archive --remote=ssh://git@<REPO_URL>.git ${DEPLOY_TAG} ecs | tar -x
+                    git archive --remote=ssh://git@<REPO_URL>.git ${DEPLOY_TAG} docker | tar -x
+                '''
+            }
+        }
+        stage('docker build') {
+            when { branch 'develop' }
+            steps {
+                sh '''
+                    export....
+                    commands...
+                '''
+            }
+        }
+        stage('Execute TF @DEV') {
+            environment {
+                DEPLOY_ROLE_NAME = '<DEV_DEPLOY_IAM_REPO>'
+            }
+            when { expression { return env.RUN_TF_AT_DV == 'true'; } }
+            parallel {
+                stage('TF for <STACK/APP_NAME>') {
+                    when { branch 'develop' }
+                    steps {
+                        sh '''
+                            export...
+                            commands...
+                            
+                        '''
+                    }
+                }
+            }
+        }
+        stage('<APP_NAME> @DEV') {
+            when { expression { return env.RUN_ECS_AT_DV == 'true'; } }
+            environment {
+                DEPLOY_ROLE_NAME = '<DEV_DEPLOY_IAM_REPO>'
+                // This is deploy script option, can be removed or ignored
+                // ACTION = 'override'
+            }
+            parallel {
+                stage('Deploy App') {
+                    when { branch 'develop' }
+                    steps {
+                        sh '''
+                            export...
+                            commands...
+                        '''
+                    }
+                }
+            }
+        }
+        // End Dev steps
+        stage('Execute TF @STAGING') {
+            environment {
+                DEPLOY_ROLE_NAME = '<DEV_DEPLOY_IAM_REPO>'
+            }
+            when { expression { return env.RUN_TF_AT_DEV == 'true'; } }
+            parallel {
+                stage('TF for <STACK/APP_NAME>') {
+                    when { branch 'staging' }
+                    steps {
+                        sh '''
+                            export...
+                            commands...
+                            
+                        '''
+                    }
+                }
+            }
+        }
+        stage('<APP_NAME> @STAGING') {
+            when { expression { return env.RUN_ECS_STAGE == 'true'; } }
+            environment {
+                DEPLOY_ROLE_NAME = '<STAGE_DEPLOY_IAM_REPO>'
+                // This is deploy script option, can be removed or ignored
+                // ACTION = 'override'
+            }
+            parallel {
+                stage('Deploy App') {
+                    when { branch 'staging' }
+                    steps {
+                        sh '''
+                            export...
+                            commands...
+                        '''
+                    }
+                }
+            }
+        }
+        // End Dev Stage steps
+        stage('Execute TF @PROD') {
+            environment {
+                DEPLOY_ROLE_NAME = '<PROD_DEPLOY_IAM_REPO>'
+            }
+            when { expression { return env.RUN_TF_PROD == 'true'; } }
+            parallel {
+                stage('TF for <STACK/APP_NAME>') {
+                    when { branch 'master' }
+                    steps {
+                        sh '''
+                            export...
+                            commands...
+                            
+                        '''
+                    }
+                }
+            }
+        }
+        stage('<APP_NAME> @STAGING') {
+            when { expression { return env.RUN_ECS_PROD == 'true'; } }
+            environment {
+                DEPLOY_ROLE_NAME = '<PROD_DEPLOY_IAM_REPO>'
+                // This is deploy script option, can be removed or ignored
+                // ACTION = 'override'
+            }
+            parallel {
+                stage('Deploy App') {
+                    when { branch 'master' }
+                    steps {
+                        sh '''
+                            export...
+                            commands...
+                        '''
+                    }
+                }
+            }
+        }
+        // End Production Stages
+    }
+    // End stages
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
