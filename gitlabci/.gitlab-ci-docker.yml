@@ -1,0 +1,21 @@
+stages:
+  - docker-build-push 
+variables:
+  ECR_ACCOUNT_ID: "<Account_Id>"
+  ECR_REGION: "<Aws_Region>"
+  ECR_REPO: "pyhellow"
+  ECR_TAG: "rc1"
+
+default:
+  tags:
+    - "aws" # We are assuming the runner is on AWS
+    - "<Runner_tag>"
+
+docker.build.push:
+  stage: docker-build-push
+  image: 
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - echo "{\"credsStore\":\"ecr-login\",\"credHelpers\":{\"$ECR_ACCOUNT_ID.dkr.ecr.$ECR_REGION.amazonaws.com\":\"ecr-login\"}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $ECR_ACCOUNT_ID.dkr.ecr.$ECR_REGION.amazonaws.com/$ECR_REPO:$ECR_TAG
